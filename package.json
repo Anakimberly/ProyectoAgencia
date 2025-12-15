@@ -1,0 +1,44 @@
+{
+  "name": "sistemaagencia",
+  "version": "1.0.0",
+  "description": "",
+  "main": "electron-main.js",
+
+  "build": {
+  "appId": "com.agencia.sistema",
+  "productName": "SistemaAgencia",
+  "files": [
+    "backend/**/*",
+    "frontend/dist/**/*",
+    "electron-main.js",
+    "preload.js",
+    "node_modules/**/*"
+  ],
+  "win": {
+    "signAndEditExecutable": false
+  }
+},
+
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && node server.js",
+    "dev:electron": "cross-env BACKEND_PORT=4000 electron .",
+    "dev": "concurrently -k \"npm:dev:frontend\" \"npm:dev:backend\" \"npm:dev:electron\"",
+    "build:frontend": "cd frontend && npm run build",
+    "pack": "npm run build:frontend && electron-builder --dir",
+    "dist": "npm run build:fronte d && electron-builder"
+  },
+
+  "keywords": [],
+  "author": "Ameli Reyes",
+  "license": "MIT",
+
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.12",
+    "wait-port": "^1.1.0"
+  }
+}
+
