@@ -372,6 +372,94 @@ app.put('/api/cargos/:id', async (req, res) => {
   }
 });
 
+// ========== ENDPOINTS DE AUTENTICACIÓN ==========
+
+const bcrypt = require('bcrypt');
+
+// Login
+// Login
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    // DEBUG: Ver exactlyo qué llega
+    console.log(`[LOGIN DEBUG] Intento de login para usuario: '${username}'`);
+    if (password) {
+      console.log(`[LOGIN DEBUG] Password recibido: '${password}' (len=${password.length})`);
+      console.log(`[LOGIN DEBUG] Códigos ASCII: ${[...password].map(c => c.charCodeAt(0)).join(', ')}`);
+    }
+
+    const [rows] = await pool.query('SELECT * FROM usuarios WHERE username = ?', [username]);
+
+    if (rows.length === 0) {
+      console.log(`[LOGIN FAIL] Usuario '${username}' NO encontrado en la base de datos.`);
+      return res.status(401).json({ error: 'Usuario no encontrado en la Base de Datos.' });
+    }
+
+    const user = rows[0];
+    console.log(`[LOGIN DEBUG] Usuario encontrado. Hash almacenado: ${user.password_hash.substring(0, 20)}...`);
+
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+
+    if (!validPassword) {
+      console.log(`[LOGIN FAIL] Contraseña incorrecta para '${username}'.`);
+      return res.status(401).json({ error: 'Contraseña incorrecta.' });
+    }
+
+    // Login exitoso
+    console.log(`[LOGIN SUCCESS] Login exitoso para '${username}'.`);
+    res.json({ message: 'Login exitoso', userId: user.id, username: user.username });
+
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cambiar contraseña (con restricción de 1 año)
+app.put('/api/change-password', async (req, res) => {
+  try {
+    const { username, currentPassword, newPassword } = req.body;
+
+    // 1. Verificar usuario
+    const [rows] = await pool.query('SELECT * FROM usuarios WHERE username = ?', [username]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const user = rows[0];
+
+    // 2. Verificar contraseña actual
+    const validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!validPassword) return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+
+    // 3. Verificar restricción de tiempo (1 año = 365 días)
+    if (user.last_password_change) {
+      const lastChange = new Date(user.last_password_change);
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+      if (lastChange > oneYearAgo) {
+        return res.status(403).json({
+          error: 'Solo puedes cambiar la contraseña una vez al año. Último cambio: ' + lastChange.toLocaleDateString()
+        });
+      }
+    }
+
+    // 4. Actualizar contraseña
+    const saltRounds = 10;
+    const newHash = await bcrypt.hash(newPassword, saltRounds);
+
+    await pool.query(
+      'UPDATE usuarios SET password_hash = ?, last_password_change = NOW() WHERE id = ?',
+      [newHash, user.id]
+    );
+
+    res.json({ message: 'Contraseña actualizada exitosamente' });
+
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== HEALTH CHECK ==========
 app.get('/api/health', async (req, res) => {
   try {

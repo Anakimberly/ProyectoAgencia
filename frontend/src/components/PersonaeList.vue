@@ -714,16 +714,10 @@ onMounted(() => {
 <style scoped>
 /* Layout principal - Full screen */
 .personae-list {
-  min-height: 100vh;
-  width: 100vw; /* Ancho total del viewport */
+  width: 100%;
   max-width: 100%;
-  padding: 20px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 0;
   box-sizing: border-box;
-  margin: 0;
-  position: absolute; /* Asegurar que no haya márgenes externos */
-  top: 0;
-  left: 0;
 }
 
 /* Header mejorado */

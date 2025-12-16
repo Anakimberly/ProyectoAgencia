@@ -1,72 +1,174 @@
 <script setup>
-import PersonaeList from './components/PersonaeList.vue'
+import { ref, onMounted, reactive } from 'vue';
+import PersonaeList from './components/PersonaeList.vue';
+import Login from './components/Login.vue';
+
+const isAuthenticated = ref(false);
+const currentUser = ref('');
+
+// Estado para cambio de contraseña
+const showChangePassword = ref(false);
+const pwdForm = reactive({ current: '', new: '' });
+const pwdMsg = ref('');
+const pwdType = ref('');
+
+onMounted(() => {
+  const session = localStorage.getItem('userSession');
+  if (session) {
+    const data = JSON.parse(session);
+    isAuthenticated.value = true;
+    currentUser.value = data.username;
+  }
+});
+
+const onLoginSuccess = (data) => {
+  isAuthenticated.value = true;
+  currentUser.value = data.username;
+};
+
+const logout = () => {
+  localStorage.removeItem('userSession');
+  isAuthenticated.value = false;
+  currentUser.value = '';
+};
+
+const changePassword = async () => {
+  pwdMsg.value = '';
+  try {
+    const response = await fetch('http://localhost:4000/api/change-password', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: currentUser.value,
+        currentPassword: pwdForm.current,
+        newPassword: pwdForm.new
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) throw new Error(data.error);
+    
+    pwdMsg.value = 'Contraseña actualizada correctamente';
+    pwdType.value = 'success';
+    setTimeout(() => {
+      showChangePassword.value = false;
+      pwdForm.current = ''; 
+      pwdForm.new = '';
+      pwdMsg.value = '';
+    }, 2000);
+  } catch (err) {
+    pwdMsg.value = err.message;
+    pwdType.value = 'error';
+  }
+};
 </script>
 
 <template>
-  <div class="app-container">
+  <div v-if="isAuthenticated" class="app-container">
     <header class="app-header">
       <h1>🏢 Sistema de Gestión de Agencia</h1>
       <p class="subtitle">Gestión completa de personas, aportaciones y cargos</p>
+      
+      <div class="header-actions">
+        <button @click="showChangePassword = true" class="action-btn">
+          🔒 Cambiar Contraseña
+        </button>
+        <button @click="logout" class="action-btn logout">
+          Cerrar Sesión ({{ currentUser }})
+        </button>
+      </div>
     </header>
     
     <main class="app-main">
       <PersonaeList />
     </main>
+
+    <!-- Footer eliminado para evitar obstrucciones -->
+  </div>
+
+  <Login v-else @login-success="onLoginSuccess" />
+
+  <!-- Modal Cambio de Contraseña (fuera del container principal para mejor stacking) -->
+  <div v-if="showChangePassword" class="modal-overlay">
+    <div class="modal-card">
+      <h3>Cambiar Contraseña</h3>
+      <form @submit.prevent="changePassword">
+        <div class="form-group">
+          <label>Contraseña Actual</label>
+          <input v-model="pwdForm.current" type="password" required>
+        </div>
+        <div class="form-group">
+          <label>Nueva Contraseña</label>
+          <input v-model="pwdForm.new" type="password" required>
+        </div>
+        <div v-if="pwdMsg" :class="['msg', pwdType]">{{ pwdMsg }}</div>
+        <div class="modal-actions">
+          <button type="submit" class="btn-primary">Actualizar</button>
+          <button type="button" @click="showChangePassword = false" class="btn-secondary">Cancelar</button>
+        </div>
+      </form>
+    </div>
   </div>
 </template>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Global Reset */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   min-height: 100vh;
 }
 
 .app-container {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
 }
 
+/* Header */
 .app-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 30px 20px;
+  padding: 20px 20px;
   text-align: center;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
 }
 
-.app-header h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
+.app-header h1 { font-size: 2rem; }
+.subtitle { opacity: 0.9; }
 
-.subtitle {
-  font-size: 1.1rem;
-  opacity: 0.95;
-  font-weight: 300;
-}
+.header-actions { display: flex; gap: 10px; }
+.action-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: 0.2s; font-weight: 600; }
+.action-btn:hover { background: rgba(255,255,255,0.3); }
+.action-btn.logout:hover { background: #ffebee; color: #c62828; }
 
+/* Main Content */
 .app-main {
-  flex: 1;
+  flex: 1 0 auto; 
   padding: 20px;
+  padding-bottom: 60px; 
 }
 
-.app-footer {
-  background: #2c3e50;
-  color: white;
-  text-align: center;
-  padding: 30px;
-  width: 100%;
-  margin-top: auto; /* Empuja el footer al fondo si hay poco contenido */
-  position: relative; /* Asegura que siga el flujo del documento */
-}
+/* Footer Styles Removed */
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+.modal-card { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+.modal-card h3 { color: #2c3e50; margin-bottom: 20px; text-align: center; }
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; color: #4a5568; font-weight: 600; }
+.form-group input { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.btn-primary { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+.btn-secondary { background: #cbd5e0; color: #4a5568; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+.msg { padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 0.9rem; text-align: center; }
+.msg.success { background: #d4edda; color: #155724; }
+.msg.error { background: #f8d7da; color: #721c24; }
 </style>
-
